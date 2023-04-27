@@ -1,7 +1,15 @@
 # ld-base
-Code utilities for Ludum Dare
+Base stuff for Ludum Dare
 
-This is a bunch of core game stuff stuff, mostly a simplified version of the code from my last Ludum Dare. Also the base typescript building stuff.
+This is a small game engine, mostly a simplified version of the code from my last Ludum Dare. Includes the following:
+
+- A general game loop
+- Basic platformer physics
+- Level parsing from gif files
+- Code for loading & rendering sprites from Aseprite
+- Code for playing sound effects
+- Some rough touch controls
+- All the configuration for the typescript tooling
 
 ![demo.gif](demo.gif)
 
