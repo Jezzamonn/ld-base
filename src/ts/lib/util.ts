@@ -131,6 +131,6 @@ export function choose<T>(arr: Array<T>, rng: () => number): T {
     return arr[index];
 }
 
-export async function wait(seconds: number) {
-    await new Promise(resolve => setTimeout(resolve, seconds * 1000));
+export function wait(seconds: number) {
+    return new Promise(resolve => setTimeout(resolve, seconds * 1000));
 }
