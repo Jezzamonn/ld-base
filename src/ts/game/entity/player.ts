@@ -1,11 +1,11 @@
 import { FacingDir, Point } from "../../common";
 import { FPS, JUMP_KEYS, LEFT_KEYS, physFromPx, PHYSICS_SCALE, RIGHT_KEYS } from "../../constants";
+import { Aseprite } from "../../lib/aseprite";
+import { NullKeys } from "../../lib/keys";
 import { Level } from "../level";
 import { SFX } from "../sfx";
-import { NullKeys } from "../../lib/keys";
-import { Entity } from "./entity";
-import { Aseprite } from "../../lib/aseprite";
 import { ObjectTile } from "../tile/object-layer";
+import { Entity } from "./entity";
 
 const imageName = 'player';
 
@@ -13,6 +13,9 @@ export class Player extends Entity {
 
     runSpeed = 1.5 * PHYSICS_SCALE * FPS;
     jumpSpeed = 3 * PHYSICS_SCALE * FPS;
+
+    groundAccel = 0.25 * PHYSICS_SCALE * FPS * FPS / 2;
+    airAccel = 0.125 * PHYSICS_SCALE * FPS * FPS / 2;
 
     controlledByPlayer = true;
 
@@ -22,7 +25,7 @@ export class Player extends Entity {
         this.w = physFromPx(6);
         this.h = physFromPx(10);
         // TODO: Tweak gravity? This was from Teeniest Seed.
-        this.gravity = 0.13 * PHYSICS_SCALE * FPS * FPS
+        this.gravity = 0.13 * PHYSICS_SCALE * FPS * FPS;
     }
 
     getAnimationName() {
@@ -69,7 +72,8 @@ export class Player extends Entity {
     cameraFocus(): Point {
         // TODO: This made people dizzy, should adjust it / change the speed the camera moves.
         const facingMult = this.facingDir == FacingDir.Right ? 1 : -1;
-        return { x: this.midX + facingMult * physFromPx(30), y: this.maxY };
+        const facingOffset = facingMult * physFromPx(30) * 0; // disable for now.
+        return { x: this.midX + facingOffset, y: this.maxY };
     }
 
     jump() {
@@ -77,14 +81,28 @@ export class Player extends Entity {
         SFX.play('jump');
     }
 
-    // TODO: Some easing?
+    dampX(dt: number): void {
+        this.xDampAmt = this.isStanding() ? this.groundAccel : this.airAccel;
+        super.dampX(dt);
+    }
+
     moveLeft(dt: number) {
-        this.dx = -this.runSpeed;
+        const accel = this.isStanding() ? this.groundAccel : this.airAccel;
+        this.dx -= accel * dt;
+        if (this.dx < -this.runSpeed) {
+            this.dx = -this.runSpeed;
+        }
+
         this.facingDir = FacingDir.Left;
     }
 
     moveRight(dt: number) {
-        this.dx = this.runSpeed;
+        const accel = this.isStanding() ? this.groundAccel : this.airAccel;
+        this.dx += accel * dt;
+        if (this.dx > this.runSpeed) {
+            this.dx = this.runSpeed;
+        }
+
         this.facingDir = FacingDir.Right;
     }
 

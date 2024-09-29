@@ -14,7 +14,7 @@ export class Entity {
     dy = 0;
     // Copying some constants from my previous games. Might need tweaking.
     gravity = 0;
-    xDampAmt = (1 / 8) * PHYSICS_SCALE * FPS * FPS;
+    xDampAmt = 0.125 * PHYSICS_SCALE * FPS * FPS;
     animCount = 0;
     facingDir = FacingDir.Right;
     canCollide = true;
