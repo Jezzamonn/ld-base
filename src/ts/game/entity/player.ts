@@ -1,10 +1,11 @@
-import { FacingDir, Point } from "../../common";
+import { Dir, FacingDir, Point } from "../../common";
 import { FPS, JUMP_KEYS, LEFT_KEYS, physFromPx, PHYSICS_SCALE, RIGHT_KEYS } from "../../constants";
 import { Aseprite } from "../../lib/aseprite";
 import { NullKeys } from "../../lib/keys";
 import { Level } from "../level";
 import { SFX } from "../sfx";
 import { ObjectTile } from "../tile/object-layer";
+import { PhysicTile } from "../tile/tiles";
 import { Entity } from "./entity";
 
 const imageName = 'player';
@@ -13,6 +14,7 @@ export class Player extends Entity {
 
     runSpeed = 1.5 * PHYSICS_SCALE * FPS;
     jumpSpeed = 3 * PHYSICS_SCALE * FPS;
+    wallSlideSpeed = 1 * PHYSICS_SCALE * FPS;
 
     groundAccel = 0.25 * PHYSICS_SCALE * FPS * FPS / 2;
     airAccel = 0.125 * PHYSICS_SCALE * FPS * FPS / 2;
@@ -31,29 +33,40 @@ export class Player extends Entity {
     getAnimationName() {
         let animName = 'idle';
         let loop = true;
+        let facingDir = this.facingDir;
 
         // TODO: This logic will probably need to be tweaked for whatever character this game has.
         if (!this.isStanding()) {
-            animName = 'jump';
-            if (this.dy < -0.3 * this.jumpSpeed) {
-                animName += '-up';
+            if (this.isAgainstLeftWall()) {
+                animName = 'wall-slide'
+                facingDir = FacingDir.Right;
             }
-            else if (this.dy > 0.3 * this.jumpSpeed) {
-                animName += '-down';
+            else if (this.isAgainstRightWall()) {
+                animName = 'wall-slide'
+                facingDir = FacingDir.Left;
             }
             else {
-                animName += '-mid';
+                animName = 'jump';
+                if (this.dy < -0.3 * this.jumpSpeed) {
+                    animName += '-up';
+                }
+                else if (this.dy > 0.3 * this.jumpSpeed) {
+                    animName += '-down';
+                }
+                else {
+                    animName += '-mid';
+                }
             }
         } else if (Math.abs(this.dx) > 0.01) {
             animName = 'run';
         }
-        return { animName, loop }
+        return { animName, loop, facingDir }
     }
 
     render(context: CanvasRenderingContext2D) {
         // super.render(context);
 
-        const {animName, loop} = this.getAnimationName();
+        const {animName, loop, facingDir} = this.getAnimationName();
 
         Aseprite.drawAnimation({
             context,
@@ -64,7 +77,7 @@ export class Player extends Entity {
             scale: PHYSICS_SCALE,
             anchorRatios: {x: 0.5, y: 1},
             // filter: filter,
-            flippedX: this.facingDir == FacingDir.Left,
+            flippedX: facingDir == FacingDir.Left,
             loop,
         });
     }
@@ -113,8 +126,23 @@ export class Player extends Entity {
 
         let keys = this.controlledByPlayer ? this.level.game.keys : new NullKeys();
 
-        if (this.isStanding() && keys.anyWasPressedThisFrame(JUMP_KEYS)) {
-            this.jump();
+        const isAgainstLeftWall = this.isAgainstLeftWall();
+        const isAgainstRightWall = this.isAgainstRightWall();
+
+        if (keys.anyWasPressedThisFrame(JUMP_KEYS)) {
+            if (this.isStanding()) {
+                this.jump();
+            }
+            else if (isAgainstLeftWall) {
+                // Wall jump! To da right
+                this.dx = this.runSpeed;
+                this.jump();
+            }
+            else if (isAgainstRightWall) {
+                this.dx = -this.runSpeed;
+                this.jump();
+            }
+            // You cannot jump. You fool.
         }
 
         const left = keys.anyIsPressed(LEFT_KEYS);
@@ -140,6 +168,12 @@ export class Player extends Entity {
     }
 
     applyGravity(dt: number): void {
+        if (this.isAgainstLeftWall() || this.isAgainstRightWall()) {
+            if (this.dy > this.wallSlideSpeed) {
+                const diff = this.dy - this.wallSlideSpeed;
+                this.dy -= 0.5 * diff;
+            }
+        }
         // if (!this.level.game.keys.anyIsPressed(JUMP_KEYS)) {
         //     this.dy += 2 * this.gravity * dt;
         //     return;
@@ -152,6 +186,14 @@ export class Player extends Entity {
             SFX.play('land');
         }
         super.onDownCollision();
+    }
+
+    isAgainstLeftWall() {
+        return this.isTouchingTile(this.level.tiles, [PhysicTile.Wall], { dir: Dir.Left, offset: { x: -1, y: 0 } });
+    }
+
+    isAgainstRightWall() {
+        return this.isTouchingTile(this.level.tiles, [PhysicTile.Wall], { dir: Dir.Right, offset: { x: 1, y: 0 } });
     }
 
     static async preload() {
