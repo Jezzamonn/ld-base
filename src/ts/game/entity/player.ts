@@ -10,16 +10,26 @@ import { Entity } from "./entity";
 
 const imageName = 'player';
 
+// How long the player gets to jump after falling off a platform.
+// 0.1 seems a little too lenient.
+const COYOTE_TIME_SECS = 0.08;
+
 export class Player extends Entity {
 
     runSpeed = 1.5 * PHYSICS_SCALE * FPS;
     jumpSpeed = 3 * PHYSICS_SCALE * FPS;
     wallSlideSpeed = 1 * PHYSICS_SCALE * FPS;
+    maxFallSpeed = 3 * PHYSICS_SCALE * FPS;
 
     groundAccel = 0.25 * PHYSICS_SCALE * FPS * FPS / 2;
     airAccel = 0.125 * PHYSICS_SCALE * FPS * FPS / 2;
 
     controlledByPlayer = true;
+
+    // Used to track Coyote Time.
+    onGroundCount = 0;
+    onLeftWallCount = 0;
+    onRightWallCount = 0;
 
     constructor(level: Level) {
         super(level);
@@ -92,6 +102,10 @@ export class Player extends Entity {
     jump() {
         this.dy = -this.jumpSpeed;
         SFX.play('jump');
+        // Reset coyote time variables.
+        this.onGroundCount = 0;
+        this.onLeftWallCount = 0;
+        this.onRightWallCount = 0;
     }
 
     dampX(dt: number): void {
@@ -122,23 +136,40 @@ export class Player extends Entity {
     update(dt: number) {
         this.animCount += dt;
 
+        if (this.onGroundCount > 0) {
+            this.onGroundCount -= dt;
+        }
+        if (this.onLeftWallCount > 0) {
+            this.onLeftWallCount -= dt;
+        }
+        if (this.onRightWallCount > 0) {
+            this.onRightWallCount -= dt;
+        }
+
+        if (this.isStanding()) {
+            this.onGroundCount = COYOTE_TIME_SECS;
+        }
+        if (this.isAgainstLeftWall()) {
+            this.onLeftWallCount = COYOTE_TIME_SECS;
+        }
+        if (this.isAgainstRightWall()) {
+            this.onRightWallCount = COYOTE_TIME_SECS;
+        }
+
         // TODO: Maybe checking what animation frame we're add and playing a sound effect (e.g. if it's a footstep frame.)
 
         let keys = this.controlledByPlayer ? this.level.game.keys : new NullKeys();
 
-        const isAgainstLeftWall = this.isAgainstLeftWall();
-        const isAgainstRightWall = this.isAgainstRightWall();
-
         if (keys.anyWasPressedThisFrame(JUMP_KEYS)) {
-            if (this.isStanding()) {
+            if (this.onGroundCount > 0) {
                 this.jump();
             }
-            else if (isAgainstLeftWall) {
+            else if (this.onLeftWallCount > 0) {
                 // Wall jump! To da right
                 this.dx = this.runSpeed;
                 this.jump();
             }
-            else if (isAgainstRightWall) {
+            else if (this.onRightWallCount > 0) {
                 this.dx = -this.runSpeed;
                 this.jump();
             }
@@ -171,6 +202,12 @@ export class Player extends Entity {
         if (this.isAgainstLeftWall() || this.isAgainstRightWall()) {
             if (this.dy > this.wallSlideSpeed) {
                 const diff = this.dy - this.wallSlideSpeed;
+                this.dy -= 0.5 * diff;
+            }
+        }
+        else {
+            if (this.dy > this.maxFallSpeed) {
+                const diff = this.dy - this.maxFallSpeed;
                 this.dy -= 0.5 * diff;
             }
         }
