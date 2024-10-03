@@ -11,8 +11,9 @@ import { Entity } from "./entity";
 const imageName = 'player';
 
 // How long the player gets to jump after falling off a platform.
-// 0.1 seems a little too lenient.
-const COYOTE_TIME_SECS = 0.08;
+// 0.1 seems a little too lenient, but whatever :)
+const COYOTE_TIME_SECS = 0.1;
+const BUFFER_JUMP_TIME_SECS = 0.1;
 
 export class Player extends Entity {
 
@@ -30,6 +31,8 @@ export class Player extends Entity {
     onGroundCount = 0;
     onLeftWallCount = 0;
     onRightWallCount = 0;
+
+    bufferedJumpCount = 0;
 
     constructor(level: Level) {
         super(level);
@@ -106,6 +109,7 @@ export class Player extends Entity {
         this.onGroundCount = 0;
         this.onLeftWallCount = 0;
         this.onRightWallCount = 0;
+        this.bufferedJumpCount = 0;
     }
 
     dampX(dt: number): void {
@@ -145,6 +149,9 @@ export class Player extends Entity {
         if (this.onRightWallCount > 0) {
             this.onRightWallCount -= dt;
         }
+        if (this.bufferedJumpCount > 0) {
+            this.bufferedJumpCount -= dt;
+        }
 
         if (this.isStanding()) {
             this.onGroundCount = COYOTE_TIME_SECS;
@@ -161,6 +168,10 @@ export class Player extends Entity {
         let keys = this.controlledByPlayer ? this.level.game.keys : new NullKeys();
 
         if (keys.anyWasPressedThisFrame(JUMP_KEYS)) {
+            this.bufferedJumpCount = BUFFER_JUMP_TIME_SECS;
+        }
+
+        if (this.bufferedJumpCount > 0) {
             if (this.onGroundCount > 0) {
                 this.jump();
             }
@@ -173,7 +184,7 @@ export class Player extends Entity {
                 this.dx = -this.runSpeed;
                 this.jump();
             }
-            // You cannot jump. You fool.
+            // Can't jump, sadly.
         }
 
         const left = keys.anyIsPressed(LEFT_KEYS);
