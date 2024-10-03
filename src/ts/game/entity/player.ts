@@ -178,10 +178,12 @@ export class Player extends Entity {
             else if (this.onLeftWallCount > 0) {
                 // Wall jump! To da right
                 this.dx = this.runSpeed;
+                this.facingDir = FacingDir.Right;
                 this.jump();
             }
             else if (this.onRightWallCount > 0) {
                 this.dx = -this.runSpeed;
+                this.facingDir = FacingDir.Left;
                 this.jump();
             }
             // Can't jump, sadly.
