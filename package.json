@@ -6,14 +6,26 @@
     "dev": "vite",
     "build": "vite build",
     "preview": "vite preview",
-    "clean": "rm -rf dist/"
+    "clean": "rm -rf dist/",
+    "test:screenshot": "tsx test/screenshot/test.ts",
+    "test:screenshot:approve": "APPROVE=true tsx test/screenshot/test.ts"
   },
   "author": "Jezzamon",
   "license": "ISC",
   "devDependencies": {
     "@tsconfig/recommended": "^1.0.1",
+    "@types/node": "^25.6.0",
+    "@types/pixelmatch": "^5.2.6",
+    "@types/pngjs": "^6.0.5",
+    "pixelmatch": "^7.1.0",
+    "pngjs": "^7.0.0",
+    "puppeteer": "^24.41.0",
     "sass": "^1.57.1",
-    "vite": "^8.0.8"
+    "ts-node": "^10.9.2",
+    "tsx": "^4.21.0",
+    "typescript": "^6.0.3",
+    "vite": "^8.0.8",
+    "vitest": "^4.1.4"
   },
   "dependencies": {
     "jsfxr": "github:Jezzamonn/jsfxr"

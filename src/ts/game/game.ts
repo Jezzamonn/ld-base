@@ -20,6 +20,7 @@ export class Game {
     context: CanvasRenderingContext2D;
 
     scale = 1;
+    manualTime = false;
 
     simulatedTimeMs: number | undefined;
 
@@ -51,12 +52,14 @@ export class Game {
         Aseprite.disableSmoothing(this.context);
 
         this.resize();
-        window.addEventListener('resize', () => this.resize());
+        if (!this.manualTime) {
+            window.addEventListener('resize', () => this.resize());
 
-        // Whenever any touch event happens, try to enter fullscreen.
-        window.addEventListener('touchstart', () => this.enterFullscreen());
+            // Whenever any touch event happens, try to enter fullscreen.
+            window.addEventListener('touchstart', () => this.enterFullscreen());
 
-        this.doAnimationLoop();
+            this.doAnimationLoop();
+        }
 
         this.startLevel(0);
     }
@@ -107,6 +110,13 @@ export class Game {
         this.render();
 
         requestAnimationFrame(() => this.doAnimationLoop());
+    }
+
+    advanceFrames(frames: number) {
+        for (let i = 0; i < frames; i++) {
+            this.update(TIME_STEP);
+        }
+        this.render();
     }
 
     handleInput() {
