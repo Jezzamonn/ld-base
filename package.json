@@ -2,67 +2,18 @@
   "name": "ld52",
   "version": "1.0.0",
   "description": "Ludum Dare 52",
-  "main": "webpack.config.js",
   "scripts": {
-    "watch": "npm-watch",
-    "reload": "reload -b -d build/client",
-    "static": "mkdir -p build/client/ && rsync -a --delete --exclude js/ --exclude css/ --exclude sprites/ --exclude music/ src/static/ build/client/",
-    "sass": "mkdir -p build/client/css && sass src/scss/styles.scss build/client/css/styles.css",
-    "sprites": "mkdir -p build/client/sprites && rsync -a --delete --exclude '*.aseprite' sprites/ build/client/sprites/",
-    "music": "mkdir -p build/client/music && rsync --delete -a --include='*.mp3' --exclude='*/' --exclude='*' music/ build/client/music/",
-    "webpack": "webpack",
-    "build": "npm-run-all --parallel webpack sass static sprites music",
-    "clean": "rm -rf build/*"
-  },
-  "watch": {
-    "static": {
-      "patterns": [
-        "src/static/**"
-      ],
-      "extensions": "html,css,png,gif,mp3,ttf"
-    },
-    "sprites": {
-      "patterns": [
-        "sprites/**"
-      ],
-      "extensions": "json,png,gif"
-    },
-    "music": {
-      "patterns": [
-        "music/**"
-      ],
-      "extensions": "mp3"
-    },
-    "sass": {
-      "patterns": [
-        "src/scss/**"
-      ],
-      "extensions": "scss"
-    },
-    "webpack": {
-      "patterns": [
-        "src/ts/**"
-      ],
-      "extensions": "js,jsx,ts,tsx"
-    }
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview",
+    "clean": "rm -rf dist/"
   },
   "author": "Jezzamon",
   "license": "ISC",
   "devDependencies": {
-    "@babel/cli": "^7.20.7",
-    "@babel/core": "^7.20.12",
-    "@babel/plugin-proposal-class-properties": "^7.18.6",
-    "@babel/plugin-transform-runtime": "^7.19.6",
-    "@babel/preset-env": "^7.20.2",
-    "@babel/preset-typescript": "^7.18.6",
     "@tsconfig/recommended": "^1.0.1",
-    "babel-loader": "^9.1.2",
-    "npm-run-all": "^4.1.5",
-    "npm-watch": "^0.11.0",
-    "reload": "^3.2.1",
     "sass": "^1.57.1",
-    "webpack": "^5.75.0",
-    "webpack-cli": "^5.0.1"
+    "vite": "^8.0.8"
   },
   "dependencies": {
     "jsfxr": "github:Jezzamonn/jsfxr"

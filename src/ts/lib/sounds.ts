@@ -29,26 +29,26 @@ class _Sounds {
      * Asynchronously fetches an audio.
      */
     loadSound({name, path} : {name: string, path: string}) {
+        if (this.audios.hasOwnProperty(name)) {
+            throw new Error(`Already loaded sound ${name}.`);
+        }
+
+        if (!path.endsWith('/')) {
+            path = path + '/';
+        }
+        const audioPath = `${path}${name}.mp3`;
+
+        const info: SoundInfo = {
+            loaded: false,
+            audio: undefined,
+        };
+        this.audios[name] = info;
+
         const promise = new Promise<void>((resolve) => {
-            if (this.audios.hasOwnProperty(name)) {
-                throw new Error(`Already loaded sound ${name}.`);
-            }
-
-            if (!path.endsWith('/')) {
-                path = path + '/';
-            }
-            const audioPath = `${path}${name}.mp3`;
-
-            this.audios[name] = {
-                loaded: false,
-                audio: undefined,
-                loadPromise: promise,
-            };
-
             const audio = new Audio();
             audio.oncanplaythrough = () => {
-                this.audios[name].audio = audio;
-                this.audios[name].loaded = true;
+                info.audio = audio;
+                info.loaded = true;
                 resolve();
             }
             audio.onerror = () => {
@@ -56,6 +56,8 @@ class _Sounds {
             }
             audio.src = audioPath;
         });
+        info.loadPromise = promise;
+
         return promise;
     }
 

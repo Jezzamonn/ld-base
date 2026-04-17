@@ -1,3 +1,4 @@
+import '../scss/styles.scss';
 import { Game } from "./game/game";
 
 async function init() {
