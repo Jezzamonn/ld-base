@@ -7,8 +7,8 @@
     "build": "vite build",
     "preview": "vite preview",
     "clean": "rm -rf dist/",
-    "test:screenshot": "tsx test/screenshot/test.ts",
-    "test:screenshot:approve": "APPROVE=true tsx test/screenshot/test.ts"
+    "test:screenshot": "vitest run test/screenshot/screenshot.test.ts",
+    "test:screenshot:approve": "APPROVE=true vitest run test/screenshot/screenshot.test.ts"
   },
   "author": "Jezzamon",
   "license": "ISC",

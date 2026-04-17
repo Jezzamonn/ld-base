@@ -9,12 +9,11 @@ async function init() {
 
     const game = new Game('.canvas');
     if (testMode) {
-        game.manualTime = true;
         game.keys = new MockKeys();
         (window as any).game = game;
         (window as any).advanceFrames = (n: number) => game.advanceFrames(n);
     }
-    game.start();
+    game.start(testMode);
 }
 
 window.addEventListener('load', init);

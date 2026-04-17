@@ -20,7 +20,6 @@ export class Game {
     context: CanvasRenderingContext2D;
 
     scale = 1;
-    manualTime = false;
 
     simulatedTimeMs: number | undefined;
 
@@ -46,13 +45,13 @@ export class Game {
         Sounds.loadMuteState();
     }
 
-    start() {
+    start(testMode = false) {
         this.keys.setUp();
 
         Aseprite.disableSmoothing(this.context);
 
         this.resize();
-        if (!this.manualTime) {
+        if (!testMode) {
             window.addEventListener('resize', () => this.resize());
 
             // Whenever any touch event happens, try to enter fullscreen.

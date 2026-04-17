@@ -13,22 +13,26 @@ This is a small game engine, mostly a simplified version of the code from my las
 
 ![demo.gif](demo.gif)
 
-## How to build things
-
-Install npm, then run
-
-```sh
-npm i
-npm build
-```
-
 ## How to run locally
 
-Run the two commands in different terminals:
+Run the dev server:
 
 ```sh
-npm run watch   # This watches for changes and automatically builds things when files change
-npm run reload  # This runs a local web server that automatically refreshes when files change
+npm run dev
+```
+
+## How to test
+
+Run the screenshot tests:
+
+```sh
+npm run test:screenshot
+```
+
+If you make intentional visual changes, approve them with:
+
+```sh
+npm run test:screenshot:approve
 ```
 
 ## Usage
