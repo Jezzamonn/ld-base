@@ -126,11 +126,26 @@ export function seededRandom(seed: string): () => number {
     return mulberry32(seedFn());
 }
 
-export function choose<T>(arr: Array<T>, rng: () => number): T {
+/**
+ * Fisher-Yates shuffle.
+ */
+export function shuffle<T>(array: T[], random: () => number = Math.random): T[] {
+    const result = array.slice();
+    for (let i = result.length - 1; i > 0; i--) {
+        const j = Math.floor(random() * (i + 1));
+        [result[i], result[j]] = [result[j], result[i]];
+    }
+    return result;
+}
+
+export function choose<T>(arr: readonly T[], rng: () => number = Math.random): T {
     const index = Math.floor(rng() * arr.length);
     return arr[index];
 }
 
-export function wait(seconds: number) {
-    return new Promise(resolve => setTimeout(resolve, seconds * 1000));
+/**
+ * @param delay Delay, in seconds.
+ */
+export async function wait(delay: number): Promise<void> {
+    return new Promise((resolve) => setTimeout(resolve, 1000 * delay));
 }
