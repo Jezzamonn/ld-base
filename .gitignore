@@ -2,6 +2,7 @@
 !promo/publish/
 
 /build/
+/dist/
 *.zip
 
 .vscode/
