@@ -4,6 +4,7 @@ import type { AsepriteAsset } from "../../lib/aseprite-loader";
 import { NullKeys } from "../../lib/keys";
 import { Level } from "../level";
 import { SFX } from "../sfx";
+import { BaseTile } from "../tile/base-layer";
 import { ObjectTile } from "../tile/object-layer";
 import { PhysicTile } from "../tile/tiles";
 import { Entity } from "./entity";
@@ -245,7 +246,31 @@ export class Player extends Entity {
         this.dy += this.gravity * dt;
     }
 
+    onLeftCollision() {
+        if (this.isTouchingTile(this.level.tiles.baseLayer, BaseTile.Boundary, { dir: Dir.Left })) {
+            if (this.level.tryTransition(Dir.Left)) return;
+        }
+        super.onLeftCollision();
+    }
+
+    onRightCollision() {
+        if (this.isTouchingTile(this.level.tiles.baseLayer, BaseTile.Boundary, { dir: Dir.Right })) {
+            if (this.level.tryTransition(Dir.Right)) return;
+        }
+        super.onRightCollision();
+    }
+
+    onUpCollision() {
+        if (this.isTouchingTile(this.level.tiles.baseLayer, BaseTile.Boundary, { dir: Dir.Up })) {
+            if (this.level.tryTransition(Dir.Up)) return;
+        }
+        super.onUpCollision();
+    }
+
     onDownCollision() {
+        if (this.isTouchingTile(this.level.tiles.baseLayer, BaseTile.Boundary, { dir: Dir.Down })) {
+            if (this.level.tryTransition(Dir.Down)) return;
+        }
         if (this.dy > 0.5 * this.jumpSpeed) {
             SFX.play('land');
         }

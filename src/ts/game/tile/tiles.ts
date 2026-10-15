@@ -25,6 +25,14 @@ export class Tiles implements TileSource<PhysicTile> {
     baseLayer: BaseLayer;
     objectLayer: ObjectLayer;
 
+    get renderBoundaryTiles(): boolean {
+        return this.baseLayer.renderBoundaryTiles;
+    }
+
+    set renderBoundaryTiles(value: boolean) {
+        this.baseLayer.renderBoundaryTiles = value;
+    }
+
     constructor(w: number, h: number) {
         this.baseLayer = new BaseLayer(w, h);
         this.objectLayer = new ObjectLayer(w, h);
@@ -68,7 +76,7 @@ export class Tiles implements TileSource<PhysicTile> {
 
     getTile(p: Point): PhysicTile {
         const baseTile = this.baseLayer.getTile(p);
-        if (baseTile == BaseTile.Wall) {
+        if (baseTile == BaseTile.Wall || baseTile == BaseTile.Boundary) {
             return PhysicTile.Wall;
         }
 

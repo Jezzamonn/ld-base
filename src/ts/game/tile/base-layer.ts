@@ -1,26 +1,20 @@
 import { Point } from "../../common";
+import { TILE_SIZE_PX } from "../../constants";
 import { TileLayer } from "./tile-layer";
 
 export enum BaseTile {
     Empty = 0,
     Wall = 1,
     Background = 2,
-    Unknown = 3, // Used temporarily when creating the level. Will be filled in later.
+    Boundary = 3,
+    Unknown = 4, // Used temporarily when creating the level. Will be filled in later.
 }
 
 export class BaseLayer extends TileLayer<BaseTile> {
+    renderBoundaryTiles = false;
 
     constructor(w: number, h: number) {
         super(w, h);
-
-        // // Add a floor and some walls.
-        // for (let y = 0; y < this.h; y++) {
-        //     for (let x = 0; x < this.w; x++) {
-        //         this.tiles[y][x] = y == (this.h - 1) ? BaseTile.Wall : BaseTile.Empty;
-        //     }
-        //     this.tiles[y][0] = BaseTile.Wall;
-        //     this.tiles[y][this.w - 1] = BaseTile.Wall;
-        // }
     }
 
     fillInUnknownTiles() {
@@ -132,6 +126,11 @@ export class BaseLayer extends TileLayer<BaseTile> {
                         }
                     );
                 }
+            }
+        } else if (tile == BaseTile.Boundary) {
+            if (this.renderBoundaryTiles) {
+                context.fillStyle = "#332244";
+                context.fillRect(renderPos.x, renderPos.y, TILE_SIZE_PX, TILE_SIZE_PX);
             }
         }
     }

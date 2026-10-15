@@ -1,5 +1,5 @@
-import { Point } from "../common";
-import { TILE_SIZE, TILE_SIZE_PX } from "../constants";
+import { Dir, Point } from "../common";
+import { FPS, physFromPx, PHYSICS_SCALE, TILE_SIZE, TILE_SIZE_PX } from "../constants";
 import { Entity } from "./entity/entity";
 import { Player } from "./entity/player";
 import { Images } from "../lib/images";
@@ -11,6 +11,7 @@ import { Background } from "./background";
 import { BaseTile } from "./tile/base-layer";
 import { ObjectTile } from "./tile/object-layer";
 import { Container } from "pixi.js";
+import { RoomBounds, floodFillRoom, extractRoomData } from "./room-loader";
 
 export interface LevelEntity {
     type: string;
@@ -39,6 +40,11 @@ export class Level {
     start: Point = { x: 0, y: 0 };
 
     won = false;
+
+    renderBoundaryTiles = false;
+    fullMapData: LevelData | null = null;
+    currentRoomBounds: RoomBounds | null = null;
+    transitionCooldown = 0;
 
     /**
      * Root display object for the level. Contains the background (which
@@ -167,6 +173,7 @@ export class Level {
         this.entities = [];
 
         this.tiles = new Tiles(width, height);
+        this.tiles.renderBoundaryTiles = this.renderBoundaryTiles;
         this.background = new Background(this, {
             x: TILE_SIZE_PX * width / 2,
             y: TILE_SIZE_PX * height / 2,
@@ -188,6 +195,7 @@ export class Level {
         }
 
         this.initScene();
+        this._updateCameraBounds();
 
         for (const entity of data.entities) {
             const pos = this.tiles.getTileCoord({ x: entity.x, y: entity.y }, { x: 0.5, y: 1 });
@@ -196,6 +204,141 @@ export class Level {
                 this.spawnPlayer(pos);
             }
         }
+    }
+
+    loadMapWithRooms(data: LevelData) {
+        this.fullMapData = data;
+        this.transitionCooldown = 0;
+
+        const playerEntity = data.entities.find(e => e.type === 'player');
+        if (!playerEntity) {
+            console.warn('No player entity found in map data — loading full map.');
+            this.initFromJson(data);
+            return;
+        }
+
+        const roomBounds = floodFillRoom(data, playerEntity.x, playerEntity.y);
+        const roomData = extractRoomData(data, roomBounds);
+        this._loadRoomFromData(roomBounds, roomData, null);
+
+        const playerRoomX = playerEntity.x - roomBounds.minTileX;
+        const playerRoomY = playerEntity.y - roomBounds.minTileY;
+        const playerPos = this.tiles.getTileCoord({ x: playerRoomX, y: playerRoomY }, { x: 0.5, y: 1 });
+        this.start = playerPos;
+        this.spawnPlayer(playerPos);
+    }
+
+    private _loadRoomFromData(bounds: RoomBounds, roomData: LevelData, existingPlayer: Player | null) {
+        for (const entity of this.entities) {
+            if (entity !== existingPlayer) {
+                entity.removeFromScene();
+            }
+        }
+        this.entities = existingPlayer ? [existingPlayer] : [];
+
+        this.currentRoomBounds = bounds;
+        const roomWidth = bounds.maxTileX - bounds.minTileX + 1;
+        const roomHeight = bounds.maxTileY - bounds.minTileY + 1;
+
+        this.tiles = new Tiles(roomWidth, roomHeight);
+        this.tiles.renderBoundaryTiles = this.renderBoundaryTiles;
+
+        for (let y = 0; y < roomHeight; y++) {
+            for (let x = 0; x < roomWidth; x++) {
+                this.tiles.baseLayer.setTile({ x, y }, roomData.tiles[y][x], { allowGrow: false });
+            }
+        }
+        this.tiles.baseLayer.fillInUnknownTiles();
+
+        if (roomData.objectTiles) {
+            for (let y = 0; y < Math.min(roomHeight, roomData.objectTiles.length); y++) {
+                for (let x = 0; x < Math.min(roomWidth, roomData.objectTiles[y].length); x++) {
+                    this.tiles.objectLayer.setTile({ x, y }, roomData.objectTiles[y][x], { allowGrow: false });
+                }
+            }
+        }
+
+        this.initScene();
+        this._updateCameraBounds();
+    }
+
+    private _updateCameraBounds() {
+        if (this.camera) {
+            this.camera.bounds = {
+                minX: 0,
+                minY: 0,
+                maxX: this.tiles.baseLayer.w * TILE_SIZE,
+                maxY: this.tiles.baseLayer.h * TILE_SIZE,
+            };
+        }
+    }
+
+    tryTransition(dir: Dir): boolean {
+        if (!this.fullMapData || !this.currentRoomBounds || this.transitionCooldown > 0) return false;
+
+        const player = this.entities.find(e => e instanceof Player) as Player | undefined;
+        if (!player || player.done) return false;
+
+        const playerTileX = Math.floor(player.midX / TILE_SIZE);
+        const playerTileY = Math.floor(player.midY / TILE_SIZE);
+
+        let dx = 0, dy = 0;
+        if (dir === Dir.Left) dx = -1;
+        else if (dir === Dir.Right) dx = 1;
+        else if (dir === Dir.Up) dy = -1;
+        else if (dir === Dir.Down) dy = 1;
+
+        const fullTileX = playerTileX + this.currentRoomBounds.minTileX;
+        const fullTileY = playerTileY + this.currentRoomBounds.minTileY;
+
+        const mapH = this.fullMapData.tiles.length;
+        const mapW = mapH > 0 ? this.fullMapData.tiles[0].length : 0;
+
+        let scanX = fullTileX + dx;
+        let scanY = fullTileY + dy;
+
+        while (
+            scanX >= 0 && scanX < mapW &&
+            scanY >= 0 && scanY < mapH &&
+            this.fullMapData.tiles[scanY][scanX] === BaseTile.Boundary
+        ) {
+            scanX += dx;
+            scanY += dy;
+        }
+
+        if (
+            scanX < 0 || scanX >= mapW ||
+            scanY < 0 || scanY >= mapH ||
+            this.fullMapData.tiles[scanY][scanX] === BaseTile.Boundary
+        ) return false;
+
+        const newBounds = floodFillRoom(this.fullMapData, scanX, scanY);
+        const newRoomData = extractRoomData(this.fullMapData, newBounds);
+
+        const oldBounds = this.currentRoomBounds;
+
+        this._loadRoomFromData(newBounds, newRoomData, player);
+
+        const entryTileX = scanX - newBounds.minTileX;
+        const entryTileY = scanY - newBounds.minTileY;
+
+        if (dx !== 0) {
+            player.midX = entryTileX * TILE_SIZE + TILE_SIZE / 2 + (dx > 0 ? physFromPx(4) : -physFromPx(4));
+            const fullPhysY = player.y + oldBounds.minTileY * TILE_SIZE;
+            player.y = fullPhysY - newBounds.minTileY * TILE_SIZE;
+        } else {
+            const fullPhysX = player.x + oldBounds.minTileX * TILE_SIZE;
+            player.x = fullPhysX - newBounds.minTileX * TILE_SIZE;
+            if (dy > 0) {
+                player.minY = entryTileY * TILE_SIZE + physFromPx(8);
+            } else {
+                player.maxY = (entryTileY + 1) * TILE_SIZE - 1 - physFromPx(8);
+                player.dy = -2 * PHYSICS_SCALE * FPS;
+            }
+        }
+
+        this.transitionCooldown = (dir === Dir.Left || dir === Dir.Right) ? 0.5 : 0;
+        return true;
     }
 
     serializeToJson(): LevelData {
@@ -227,6 +370,10 @@ export class Level {
     }
 
     update(dt: number) {
+        if (this.transitionCooldown > 0) {
+            this.transitionCooldown = Math.max(0, this.transitionCooldown - dt);
+        }
+
         for (const entity of this.entities) {
             entity.update(dt);
         }
