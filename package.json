@@ -28,6 +28,7 @@
     "vitest": "^4.1.4"
   },
   "dependencies": {
-    "jsfxr": "github:Jezzamonn/jsfxr"
+    "jsfxr": "github:Jezzamonn/jsfxr",
+    "pixi.js": "^8.22.0"
   }
 }
