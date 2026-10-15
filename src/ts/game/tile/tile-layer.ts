@@ -247,6 +247,29 @@ export class TileLayer<T extends number> implements TileSource<T> {
         this.tiles[p.y + this.y][p.x + this.x] = tile;
     }
 
+    resizeTo(newW: number, newH: number, fillValue: T) {
+        // Add/remove rows at the bottom
+        while (this.h < newH) {
+            this.tiles.push(new Array(this.w).fill(fillValue));
+            this.h++;
+        }
+        while (this.h > newH) {
+            this.tiles.pop();
+            this.h--;
+        }
+
+        // Add/remove columns on the right
+        for (let y = 0; y < this.h; y++) {
+            while (this.tiles[y].length < newW) {
+                this.tiles[y].push(fillValue);
+            }
+            if (this.tiles[y].length > newW) {
+                this.tiles[y].length = newW;
+            }
+        }
+        this.w = newW;
+    }
+
     setTileAtCoord(p: Point, tile: T, {allowGrow = true} = {}) {
         this.setTile({
             x: Math.floor(p.x / TILE_SIZE),

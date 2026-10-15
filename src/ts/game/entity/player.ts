@@ -50,6 +50,10 @@ export class Player extends Entity {
         this.sprite.scale.set(PHYSICS_SCALE);
     }
 
+    override getEntityType(): string {
+        return 'player';
+    }
+
     getAnimationName() {
         let animName = 'idle';
         let loop = true;

@@ -1,0 +1,185 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Level Editor</title>
+    <style>
+      body {
+        margin: 0;
+        padding: 0;
+        background-color: #1a1a1a;
+        color: #eee;
+        font-family: 'Inter', system-ui, -apple-system, sans-serif;
+        overflow: hidden;
+      }
+      #app {
+        width: 100vw;
+        height: 100vh;
+        display: flex;
+        flex-direction: column;
+      }
+      #ui {
+        position: absolute;
+        top: 20px;
+        left: 20px;
+        background: rgba(0, 0, 0, 0.8);
+        backdrop-filter: blur(8px);
+        padding: 20px;
+        border-radius: 12px;
+        border: 1px solid rgba(255, 255, 255, 0.1);
+        pointer-events: none;
+        box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5);
+        z-index: 100;
+      }
+      #ui * {
+        pointer-events: auto;
+      }
+      .tool-info {
+        margin-bottom: 15px;
+      }
+      .tool-info h3 {
+        margin: 0 0 5px 0;
+        font-size: 14px;
+        text-transform: uppercase;
+        letter-spacing: 1px;
+        color: #888;
+      }
+      .tool-info p, .tool-info select {
+        margin: 0;
+        font-size: 16px;
+        font-weight: 600;
+        color: #fff;
+        background: #222;
+        border: 1px solid #444;
+        border-radius: 6px;
+        padding: 8px 12px;
+        width: 100%;
+        outline: none;
+        cursor: pointer;
+        transition: border-color 0.2s, background 0.2s;
+        appearance: none;
+        -webkit-appearance: none;
+      }
+      .tool-info select:hover {
+        border-color: #666;
+        background: #2a2a2a;
+      }
+      .tool-info select:focus {
+        border-color: #007aff;
+        box-shadow: 0 0 0 2px rgba(0, 122, 255, 0.2);
+      }
+      .tool-info p {
+        background: transparent;
+        border: none;
+        padding: 0;
+        cursor: default;
+      }
+      .controls {
+        font-size: 12px;
+        color: #aaa;
+        line-height: 1.6;
+      }
+      .controls kbd {
+        background: #333;
+        padding: 2px 6px;
+        border-radius: 4px;
+        color: #fff;
+        font-family: inherit;
+        border: 1px solid #444;
+      }
+      #status {
+        position: absolute;
+        bottom: 20px;
+        right: 20px;
+        background: rgba(0, 0, 0, 0.6);
+        padding: 8px 16px;
+        border-radius: 20px;
+        font-size: 12px;
+        color: #888;
+        display: flex;
+        align-items: center;
+      }
+      canvas {
+        display: block;
+        image-rendering: pixelated;
+        image-rendering: crisp-edges;
+      }
+    </style>
+  </head>
+  <body>
+    <div id="app"></div>
+    <div id="ui">
+      <div class="tool-info">
+        <h3>Current Selection</h3>
+        <select id="current-selection">
+          <optgroup label="Base Tiles">
+            <option value="base:1">Wall</option>
+            <option value="base:2">Background</option>
+            <option value="base:0">Empty Wall</option>
+          </optgroup>
+          <optgroup label="Object Tiles">
+            <option value="object:3">Platform</option>
+            <option value="object:2">Goal</option>
+            <option value="object:1">Spawn</option>
+            <option value="object:0">Empty Object</option>
+          </optgroup>
+          <optgroup label="Entities">
+            <option value="entity:none">— Erase Entity —</option>
+            <option value="entity:player">Player</option>
+          </optgroup>
+        </select>
+      </div>
+      <div class="tool-info">
+        <h3>Active Layer</h3>
+        <p id="current-layer" style="font-size: 14px; font-weight: 700; letter-spacing: 0.5px; color: #e67e22;">Base Tiles</p>
+      </div>
+      <div class="tool-info">
+        <h3>Current Tool</h3>
+        <p id="current-tool">Draw (B/K/I)</p>
+      </div>
+      <div class="tool-info">
+        <h3>Brush Size</h3>
+        <select id="brush-size">
+          <option value="1">1×1</option>
+          <option value="2">2×2</option>
+          <option value="3">3×3</option>
+          <option value="4">4×4</option>
+        </select>
+      </div>
+      <div class="tool-info">
+        <h3>Level Size</h3>
+        <div style="display: flex; gap: 8px; align-items: center;">
+          <input id="level-width" type="number" min="1" max="256" value="40" style="width: 56px; padding: 6px 8px; background: #222; border: 1px solid #444; border-radius: 6px; color: #fff; font-size: 14px; outline: none;">
+          <span style="color: #888;">×</span>
+          <input id="level-height" type="number" min="1" max="256" value="30" style="width: 56px; padding: 6px 8px; background: #222; border: 1px solid #444; border-radius: 6px; color: #fff; font-size: 14px; outline: none;">
+          <button id="btn-resize" style="flex: 1; padding: 6px 8px; background: #333; border: 1px solid #444; border-radius: 6px; color: #fff; cursor: pointer; font-size: 13px;">Apply</button>
+        </div>
+      </div>
+      <div class="tool-info">
+        <h3>File Operations</h3>
+        <div style="display: flex; gap: 8px; flex-wrap: wrap;">
+          <button id="btn-new" style="flex: 1; min-width: 60px; padding: 8px; background: #333; border: 1px solid #444; border-radius: 6px; color: #fff; cursor: pointer;">New</button>
+          <button id="btn-open" style="flex: 1; min-width: 60px; padding: 8px; background: #333; border: 1px solid #444; border-radius: 6px; color: #fff; cursor: pointer;">Open</button>
+          <button id="btn-save" style="flex: 1; min-width: 60px; padding: 8px; background: #007aff; border: none; border-radius: 6px; color: #fff; cursor: pointer; font-weight: bold;">Save</button>
+          <button id="btn-save-as" style="flex: 1; min-width: 80px; padding: 8px; background: #333; border: 1px solid #444; border-radius: 6px; color: #fff; cursor: pointer;">Save As</button>
+        </div>
+      </div>
+      <div class="controls">
+        <p><kbd>B</kbd> Draw <kbd>K</kbd> Fill <kbd>I</kbd> Eyedrop <kbd>M</kbd> Select</p>
+        <p><kbd>C</kbd> Copy <kbd>X</kbd> Cut <kbd>V</kbd> Paste <kbd>Esc</kbd> Cancel</p>
+        <p><kbd>Z</kbd> Undo</p>
+        <p><kbd>1</kbd> Base Tiles &nbsp;<kbd>2</kbd> Object Tiles &nbsp;<kbd>3</kbd> Entities</p>
+        <p><kbd>[</kbd><kbd>]</kbd> Cycle Selection</p>
+        <p><kbd>S</kbd> Save <kbd>O</kbd> Open <kbd>N</kbd> New</p>
+        <p><kbd>E</kbd> Export to Clipboard</p>
+      </div>
+    </div>
+    <div id="status">
+        <span id="status-detail">Unsaved Level</span>
+        <span style="margin: 0 10px; opacity: 0.3;">|</span>
+        <span id="status-msg">Ready</span>
+    </div>
+    <script type="module" src="src/ts/editor/editor-main.ts"></script>
+  </body>
+</html>

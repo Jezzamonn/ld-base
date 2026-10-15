@@ -29,6 +29,10 @@ export class Entity {
         this.level = level;
     }
 
+    getEntityType(): string | undefined {
+        return undefined;
+    }
+
     update(dt: number) {
         this.animCount += dt;
 

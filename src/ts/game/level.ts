@@ -1,9 +1,9 @@
 import { Point } from "../common";
-import { TILE_SIZE_PX } from "../constants";
+import { TILE_SIZE, TILE_SIZE_PX } from "../constants";
 import { Entity } from "./entity/entity";
 import { Player } from "./entity/player";
 import { Images } from "../lib/images";
-import { FocusCamera } from "./camera";
+import { Camera, FocusCamera } from "./camera";
 import { Game } from "./game";
 import { LevelInfo } from "./levels";
 import { Tiles } from "./tile/tiles";
@@ -12,6 +12,18 @@ import { BaseTile } from "./tile/base-layer";
 import { ObjectTile } from "./tile/object-layer";
 import { Container } from "pixi.js";
 
+export interface LevelEntity {
+    type: string;
+    x: number;
+    y: number;
+}
+
+export interface LevelData {
+    tiles: number[][];
+    objectTiles?: number[][];
+    entities: LevelEntity[];
+}
+
 // Contains everything in one level, including the tiles and the entities.
 export class Level {
     game: Game;
@@ -19,7 +31,7 @@ export class Level {
     image: HTMLImageElement | undefined;
     levelInfo: LevelInfo
 
-    camera: FocusCamera = new FocusCamera();
+    camera: Camera = new FocusCamera();
     background: Background | undefined;
 
     tiles: Tiles = new Tiles(0, 0);
@@ -134,13 +146,84 @@ export class Level {
         entity.removeFromScene();
     }
 
-    spawnPlayer() {
+    spawnPlayer(pos?: Point) {
         const player = new Player(this);
-        player.midX = this.start.x;
-        player.maxY = this.start.y;
+        player.midX = pos?.x ?? this.start.x;
+        player.maxY = pos?.y ?? this.start.y;
         this.addEntity(player);
 
-        this.camera.target = () => player.cameraFocus();
+        if (this.camera instanceof FocusCamera) {
+            this.camera.target = () => player.cameraFocus();
+        }
+    }
+
+    initFromJson(data: LevelData) {
+        const height = data.tiles.length;
+        const width = height > 0 ? data.tiles[0].length : 0;
+
+        for (const entity of this.entities) {
+            entity.removeFromScene();
+        }
+        this.entities = [];
+
+        this.tiles = new Tiles(width, height);
+        this.background = new Background(this, {
+            x: TILE_SIZE_PX * width / 2,
+            y: TILE_SIZE_PX * height / 2,
+        });
+
+        for (let y = 0; y < height; y++) {
+            for (let x = 0; x < width; x++) {
+                this.tiles.baseLayer.setTile({ x, y }, data.tiles[y][x], { allowGrow: false });
+            }
+        }
+        this.tiles.baseLayer.fillInUnknownTiles();
+
+        if (data.objectTiles) {
+            for (let y = 0; y < Math.min(height, data.objectTiles.length); y++) {
+                for (let x = 0; x < Math.min(width, data.objectTiles[y].length); x++) {
+                    this.tiles.objectLayer.setTile({ x, y }, data.objectTiles[y][x], { allowGrow: false });
+                }
+            }
+        }
+
+        this.initScene();
+
+        for (const entity of data.entities) {
+            const pos = this.tiles.getTileCoord({ x: entity.x, y: entity.y }, { x: 0.5, y: 1 });
+            if (entity.type === 'player') {
+                this.start = pos;
+                this.spawnPlayer(pos);
+            }
+        }
+    }
+
+    serializeToJson(): LevelData {
+        const tiles: number[][] = [];
+        for (let y = 0; y < this.tiles.baseLayer.h; y++) {
+            tiles[y] = [];
+            for (let x = 0; x < this.tiles.baseLayer.w; x++) {
+                tiles[y][x] = this.tiles.baseLayer.getTile({ x: x - this.tiles.baseLayer.x, y: y - this.tiles.baseLayer.y });
+            }
+        }
+
+        const objectTiles: number[][] = [];
+        for (let y = 0; y < this.tiles.objectLayer.h; y++) {
+            objectTiles[y] = [];
+            for (let x = 0; x < this.tiles.objectLayer.w; x++) {
+                objectTiles[y][x] = this.tiles.objectLayer.getTile({ x: x - this.tiles.objectLayer.x, y: y - this.tiles.objectLayer.y });
+            }
+        }
+
+        const entities: LevelEntity[] = this.entities
+            .filter(e => e.getEntityType() !== undefined)
+            .map(e => ({
+                type: e.getEntityType()!,
+                x: Math.floor(e.midX / TILE_SIZE),
+                y: Math.floor(e.maxY / TILE_SIZE)
+            }));
+
+        return { tiles, objectTiles, entities };
     }
 
     update(dt: number) {
