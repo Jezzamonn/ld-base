@@ -88,15 +88,18 @@ export class Player extends Entity {
     }
 
     addToScene(container: Container) {
+        super.addToScene(container);
         container.addChild(this.sprite);
         this.updateGraphics();
     }
 
     removeFromScene() {
+        super.removeFromScene();
         this.sprite.removeFromParent();
     }
 
     updateGraphics() {
+        super.updateGraphics();
         const {animName, loop, facingDir} = this.getAnimationName();
 
         const asset = Assets.get<AsepriteAsset>(spritePath);

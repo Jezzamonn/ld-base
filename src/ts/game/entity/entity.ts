@@ -1,5 +1,5 @@
 import { Dir, Dirs, FacingDir, Point } from "../../common";
-import { FPS, PHYSICS_SCALE } from "../../constants";
+import { DEBUG_HITBOXES, FPS, PHYSICS_SCALE } from "../../constants";
 import { Level } from "../level";
 import { PhysicTile, TileSource } from "../tile/tiles";
 import { Container, Graphics } from "pixi.js";
@@ -24,9 +24,13 @@ export class Entity {
     /** Color of the placeholder rectangle. Set to undefined if the entity has its own graphics. */
     debugColor: string | undefined = '#ff00ff'
     placeholderGraphics: Graphics | undefined;
+    debugHitboxGraphics?: Graphics;
 
     constructor(level: Level) {
         this.level = level;
+        if (DEBUG_HITBOXES) {
+            this.debugHitboxGraphics = new Graphics();
+        }
     }
 
     getEntityType(): string | undefined {
@@ -175,12 +179,19 @@ export class Entity {
                 .fill(this.debugColor);
             container.addChild(this.placeholderGraphics);
         }
+        if (this.debugHitboxGraphics) {
+            this.debugHitboxGraphics.clear();
+            this.debugHitboxGraphics.rect(0, 0, this.w, this.h);
+            this.debugHitboxGraphics.fill({ color: this.debugColor || '#ff00ff', alpha: 0.5 });
+            container.addChild(this.debugHitboxGraphics);
+        }
         this.updateGraphics();
     }
 
     /** Removes this entity's display objects from the scene. Called when the entity is removed. */
     removeFromScene() {
         this.placeholderGraphics?.removeFromParent();
+        this.debugHitboxGraphics?.removeFromParent();
     }
 
     /**
@@ -191,6 +202,10 @@ export class Entity {
         if (this.placeholderGraphics) {
             this.placeholderGraphics.x = this.x;
             this.placeholderGraphics.y = this.y;
+        }
+        if (this.debugHitboxGraphics) {
+            this.debugHitboxGraphics.x = this.x;
+            this.debugHitboxGraphics.y = this.y;
         }
     }
 

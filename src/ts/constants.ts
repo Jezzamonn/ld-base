@@ -7,6 +7,9 @@ export const TIME_STEP = 1 / FPS;
 
 export const PIXEL_SCALE = 4;
 
+export const IS_DEBUG = typeof window !== 'undefined' && new URLSearchParams(window.location.search).has('debug');
+export const DEBUG_HITBOXES = IS_DEBUG;
+
 export const GAME_WIDTH_PX = 200;
 export const GAME_HEIGHT_PX = 150;
 export const GAME_WIDTH = GAME_WIDTH_PX * PHYSICS_SCALE;
