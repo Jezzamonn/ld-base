@@ -1,12 +1,22 @@
 import { Point } from "../../common";
-import { PHYSICS_SCALE, rng, TILE_SIZE, TILE_SIZE_PX } from "../../constants";
-import { Aseprite, images } from "../../lib/aseprite";
+import { PHYSICS_SCALE, TILE_SIZE, TILE_SIZE_PX } from "../../constants";
 import { Images } from "../../lib/images";
-import { ObjectTile } from "./object-layer";
 import { TileSource } from "./tiles";
+import { Container, Sprite, Texture } from "pixi.js";
+
+/**
+ * How many extra tiles to render around each edge of the layer. getTile()
+ * clamps to the edge of the layer, so this makes the edge tiles appear to
+ * extend past the level boundary instead of showing empty space.
+ */
+const TILE_RENDER_PADDING = 16;
 
 /**
  * 2D array of tiles.
+ *
+ * Rendering: the whole layer (plus padding) is drawn once to an offscreen
+ * canvas, which is uploaded as a single texture and shown with one Pixi
+ * Sprite. When tiles change, call `patchTiles` to redraw just those tiles.
  */
 export class TileLayer<T extends number> implements TileSource<T> {
     tiles: T[][] = [];
@@ -20,6 +30,11 @@ export class TileLayer<T extends number> implements TileSource<T> {
     animCount = 0;
 
     image: HTMLImageElement | undefined;
+
+    sprite: Sprite | undefined;
+    private canvas: HTMLCanvasElement | undefined;
+    private context: CanvasRenderingContext2D | undefined;
+    private texture: Texture | undefined;
 
     constructor(w: number, h: number) {
         this.w = w;
@@ -39,37 +54,115 @@ export class TileLayer<T extends number> implements TileSource<T> {
         this.animCount += dt;
     }
 
-    render(context: CanvasRenderingContext2D) {
+    addToScene(container: Container) {
+        if (!this.sprite) {
+            this.sprite = new Sprite();
+            this.sprite.scale.set(PHYSICS_SCALE);
+        }
+        this.redraw();
+        container.addChild(this.sprite);
+    }
+
+    removeFromScene() {
+        this.sprite?.removeFromParent();
+    }
+
+    /** Redraws the whole layer. Call this after making lots of changes, or if the layer grew. */
+    redraw() {
+        if (!this.sprite || !this.loadImage()) {
+            return;
+        }
+
+        const widthPx = (this.w + 2 * TILE_RENDER_PADDING) * TILE_SIZE_PX;
+        const heightPx = (this.h + 2 * TILE_RENDER_PADDING) * TILE_SIZE_PX;
+
+        if (!this.canvas || this.canvas.width !== widthPx || this.canvas.height !== heightPx) {
+            this.canvas = document.createElement('canvas');
+            this.canvas.width = widthPx;
+            this.canvas.height = heightPx;
+            this.context = this.canvas.getContext('2d')!;
+            this.texture?.destroy();
+            this.texture = undefined;
+        }
+
+        const context = this.context!;
+        context.clearRect(0, 0, widthPx, heightPx);
+        for (let y = this.minY - TILE_RENDER_PADDING; y <= this.maxY + TILE_RENDER_PADDING; y++) {
+            for (let x = this.minX - TILE_RENDER_PADDING; x <= this.maxX + TILE_RENDER_PADDING; x++) {
+                this.renderTile(context, { x, y }, this.canvasPos({ x, y }));
+            }
+        }
+
+        if (!this.texture) {
+            this.texture = Texture.from(this.canvas);
+            this.texture.source.scaleMode = 'nearest';
+        } else {
+            this.texture.source.update();
+        }
+
+        this.sprite.texture = this.texture;
+        this.sprite.x = (this.minX - TILE_RENDER_PADDING) * TILE_SIZE;
+        this.sprite.y = (this.minY - TILE_RENDER_PADDING) * TILE_SIZE;
+    }
+
+    /**
+     * Incrementally redraws only the changed tiles and their neighbours (as
+     * rendering can depend on adjacent tiles), then re-uploads the texture.
+     */
+    patchTiles(changedPositions: Point[]) {
+        if (!this.context || !this.texture) {
+            this.redraw();
+            return;
+        }
+
+        const toRedraw = new Map<string, Point>();
+        for (const pos of changedPositions) {
+            for (let dy = -1; dy <= 1; dy++) {
+                for (let dx = -1; dx <= 1; dx++) {
+                    const p = { x: pos.x + dx, y: pos.y + dy };
+                    toRedraw.set(`${p.x},${p.y}`, p);
+                }
+            }
+        }
+
+        for (const p of toRedraw.values()) {
+            const renderPos = this.canvasPos(p);
+            this.context.clearRect(renderPos.x, renderPos.y, TILE_SIZE_PX, TILE_SIZE_PX);
+            this.renderTile(this.context, p, renderPos);
+        }
+
+        this.texture.source.update();
+    }
+
+    /** Position of a tile within the offscreen canvas, in pixels. */
+    private canvasPos(p: Point): Point {
+        return {
+            x: (p.x - this.minX + TILE_RENDER_PADDING) * TILE_SIZE_PX,
+            y: (p.y - this.minY + TILE_RENDER_PADDING) * TILE_SIZE_PX,
+        };
+    }
+
+    private loadImage(): boolean {
         if (!this.image) {
             const imageInfo = Images.images["tiles"];
-            if (!imageInfo.loaded) {
-                return;
+            if (!imageInfo?.loaded) {
+                return false;
             }
             this.image = imageInfo.image;
         }
-
-        const invMatrix = context.getTransform().inverse();
-        const gameMinPoint = invMatrix.transformPoint({ x: 0, y: 0 });
-        const gameMaxPoint = invMatrix.transformPoint({
-            x: context.canvas.width,
-            y: context.canvas.height,
-        });
-
-        const minXTile = Math.floor(gameMinPoint.x / TILE_SIZE);
-        const minYTile = Math.floor(gameMinPoint.y / TILE_SIZE);
-        const maxXTile = Math.floor(gameMaxPoint.x / TILE_SIZE);
-        const maxYTile = Math.floor(gameMaxPoint.y / TILE_SIZE);
-
-        for (let y = minYTile; y <= maxYTile; y++) {
-            for (let x = minXTile; x <= maxXTile; x++) {
-                this.renderTile(context, { x, y });
-            }
-        }
+        return true;
     }
 
+    /**
+     * Draws a single tile to the offscreen canvas.
+     *
+     * @param pos Tile coordinate.
+     * @param renderPos Top left corner of where to draw the tile, in canvas pixels.
+     */
     renderTile(
-        context: CanvasRenderingContext2D,
-        pos: Point,
+        _context: CanvasRenderingContext2D,
+        _pos: Point,
+        _renderPos: Point,
     ) {
         // Logic handled per layer.
     }
@@ -90,9 +183,8 @@ export class TileLayer<T extends number> implements TileSource<T> {
             TILE_SIZE_PX,
             renderPos.x,
             renderPos.y,
-            // +1 is a kludge to avoid gaps between tiles.
-            TILE_SIZE + 1,
-            TILE_SIZE + 1,
+            TILE_SIZE_PX,
+            TILE_SIZE_PX,
         );
     }
 
@@ -106,18 +198,16 @@ export class TileLayer<T extends number> implements TileSource<T> {
     ) {
         // Image must be loaded when this is called.
         const halfTileSizePx = TILE_SIZE_PX / 2;
-        const halfTileSize = TILE_SIZE / 2;
         context.drawImage(
             this.image!,
             tilePos.x * TILE_SIZE_PX + subTilePos.x * halfTileSizePx,
             tilePos.y * TILE_SIZE_PX + subTilePos.y * halfTileSizePx,
             halfTileSizePx,
             halfTileSizePx,
-            renderPos.x + subTilePos.x * halfTileSize,
-            renderPos.y + subTilePos.y * halfTileSize,
-            // +1 is a kludge to avoid gaps between tiles.
-            halfTileSize + 1,
-            halfTileSize + 1
+            renderPos.x + subTilePos.x * halfTileSizePx,
+            renderPos.y + subTilePos.y * halfTileSizePx,
+            halfTileSizePx,
+            halfTileSizePx,
         );
     }
 
@@ -177,19 +267,20 @@ export class TileLayer<T extends number> implements TileSource<T> {
         });
     }
 
+    // Note: These are in tile coordinates (the same coordinates as getTile() takes).
     get minX() {
-        return this.x;
+        return -this.x;
     }
 
     get minY() {
-        return this.y;
+        return -this.y;
     }
 
     get maxX() {
-        return this.x + this.w - 1;
+        return this.w - this.x - 1;
     }
 
     get maxY() {
-        return this.y + this.h - 1;
+        return this.h - this.y - 1;
     }
 }

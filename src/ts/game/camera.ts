@@ -1,20 +1,35 @@
+import { Container } from "pixi.js";
 import { Point } from "../common";
 import { lerp } from "../lib/util";
 
+/** Where the camera's focus point appears on screen, as a ratio of the screen size. */
+export const CAMERA_SCREEN_POS: Point = { x: 0.5, y: 0.6 };
+
 export class Camera {
+    curPos: Point | undefined;
+
     constructor() {
     }
 
-    update(dt: number) {}
+    update(_dt: number) {}
 
-    applyTransform(context: CanvasRenderingContext2D) {}
+    /**
+     * Positions a container so that curPos appears at the camera's focus point.
+     *
+     * @param parallax How much the container moves relative to the camera. 1
+     *     is normal, smaller values make things appear further away.
+     */
+    applyToPixi(container: Container, parallax = 1) {
+        if (this.curPos) {
+            container.x = Math.round(-parallax * this.curPos.x);
+            container.y = Math.round(-parallax * this.curPos.y);
+        }
+    }
 }
 
 export class FocusCamera extends Camera {
 
     target: (() => { x: number, y: number }) | undefined;
-
-    curPos: Point | undefined;
 
     constructor() {
         super();
@@ -26,7 +41,7 @@ export class FocusCamera extends Camera {
         }
         const targetPos = this.target();
         if (!this.curPos) {
-            this.curPos = targetPos;
+            this.curPos = { ...targetPos };
             return;
         }
 
@@ -34,18 +49,4 @@ export class FocusCamera extends Camera {
         this.curPos.x = lerp(this.curPos.x, targetPos.x, updateSmoothness);
         this.curPos.y = lerp(this.curPos.y, targetPos.y, updateSmoothness);
     }
-
-    applyTransform(context: CanvasRenderingContext2D, scale=1) {
-        if (this.curPos) {
-            context.translate(Math.round(-scale * this.curPos.x), Math.round(-scale * this.curPos.y));
-        }
-    }
-}
-
-const screenPos: Point = { x: 0.5, y: 0.6 };
-
-export function centerCanvas(context: CanvasRenderingContext2D) {
-    context.translate(
-        Math.round(context.canvas.width * screenPos.x),
-        Math.round(context.canvas.height * screenPos.y));
 }

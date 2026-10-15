@@ -1,16 +1,16 @@
 import { Point } from "../common";
-import { rng, TILE_SIZE, TILE_SIZE_PX } from "../constants";
+import { TILE_SIZE_PX } from "../constants";
 import { Entity } from "./entity/entity";
 import { Player } from "./entity/player";
-import { Sprite } from "./entity/sprite";
 import { Images } from "../lib/images";
-import { Camera, FocusCamera } from "./camera";
+import { FocusCamera } from "./camera";
 import { Game } from "./game";
 import { LevelInfo } from "./levels";
 import { Tiles } from "./tile/tiles";
 import { Background } from "./background";
 import { BaseTile } from "./tile/base-layer";
 import { ObjectTile } from "./tile/object-layer";
+import { Container } from "pixi.js";
 
 // Contains everything in one level, including the tiles and the entities.
 export class Level {
@@ -20,13 +20,21 @@ export class Level {
     levelInfo: LevelInfo
 
     camera: FocusCamera = new FocusCamera();
-    background: Background;
+    background: Background | undefined;
 
     tiles: Tiles = new Tiles(0, 0);
 
     start: Point = { x: 0, y: 0 };
 
     won = false;
+
+    /**
+     * Root display object for the level. Contains the background (which
+     * positions itself) and the world container (which the camera moves).
+     */
+    container = new Container();
+    /** Everything that exists in world space: tiles, entities, etc. */
+    worldContainer = new Container();
 
     constructor(game: Game, levelInfo: LevelInfo) {
         this.game = game;
@@ -88,16 +96,49 @@ export class Level {
         }
         this.tiles.baseLayer.fillInUnknownTiles();
 
+        this.initScene();
+
         // this.camera.target = () => ({x: this.start.x, y: this.start.y});
 
         this.spawnPlayer();
+    }
+
+    /** (Re)builds the display tree. Call after loading the tiles. */
+    initScene() {
+        this.container.removeChildren();
+        this.worldContainer.removeChildren();
+
+        if (this.background) {
+            this.container.addChild(this.background.container);
+        }
+        this.container.addChild(this.worldContainer);
+
+        this.tiles.addToScene(this.worldContainer);
+        for (const entity of this.entities) {
+            entity.addToScene(this.worldContainer);
+        }
+    }
+
+    /** Adds an entity to the level, and its graphics to the scene. */
+    addEntity<T extends Entity>(entity: T): T {
+        this.entities.push(entity);
+        entity.addToScene(this.worldContainer);
+        return entity;
+    }
+
+    removeEntity(entity: Entity) {
+        const index = this.entities.indexOf(entity);
+        if (index >= 0) {
+            this.entities.splice(index, 1);
+        }
+        entity.removeFromScene();
     }
 
     spawnPlayer() {
         const player = new Player(this);
         player.midX = this.start.x;
         player.maxY = this.start.y;
-        this.entities.push(player);
+        this.addEntity(player);
 
         this.camera.target = () => player.cameraFocus();
     }
@@ -109,25 +150,25 @@ export class Level {
 
         for (let i = this.entities.length - 1; i >= 0; i--) {
             if (this.entities[i].done) {
+                this.entities[i].removeFromScene();
                 this.entities.splice(i, 1);
             }
         }
 
-        this.background.update(dt);
+        this.background?.update(dt);
         this.tiles.update(dt);
         this.camera.update(dt);
+
+        this.updateGraphics();
     }
 
-    render(context: CanvasRenderingContext2D) {
-        this.camera.applyTransform(context);
-
-        this.background.render(context);
-
-        this.tiles.render(context);
-
+    /** Syncs all the display objects with the current state of the level. */
+    updateGraphics() {
         for (const entity of this.entities) {
-            entity.render(context);
+            entity.updateGraphics();
         }
+        this.camera.applyToPixi(this.worldContainer);
+        this.background?.updateGraphics();
     }
 
     win() {

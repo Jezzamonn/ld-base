@@ -1,6 +1,4 @@
 import { Point } from "../../common";
-import { PHYSICS_SCALE, TILE_SIZE } from "../../constants";
-import { Aseprite } from "../../lib/aseprite";
 import { TileLayer } from "./tile-layer";
 
 export enum ObjectTile {
@@ -11,7 +9,7 @@ export enum ObjectTile {
 }
 
 // Position of the tile in the tileset.
-const tilePositions = {
+const tilePositions: Partial<Record<ObjectTile, Point>> = {
     [ObjectTile.Spawn]: { x: 6, y: 0 },
     [ObjectTile.Goal]: { x: 7, y: 0 },
     [ObjectTile.Platform]: { x: 6, y: 1 },
@@ -19,9 +17,8 @@ const tilePositions = {
 
 export class ObjectLayer extends TileLayer<ObjectTile> {
 
-    renderTile(context: CanvasRenderingContext2D, pos: Point): void {
+    renderTile(context: CanvasRenderingContext2D, pos: Point, renderPos: Point): void {
         const tile = this.getTile(pos);
-        const renderPos = {x: pos.x * TILE_SIZE, y: pos.y * TILE_SIZE }
 
         const tilePos = tilePositions[tile];
         if (!tilePos) {

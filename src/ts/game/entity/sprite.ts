@@ -1,14 +1,22 @@
 import { Point } from "../../common";
 import { physFromPx, PHYSICS_SCALE } from "../../constants";
 import { Level } from "../level";
-import { Aseprite } from "../../lib/aseprite";
+import type { AsepriteAsset } from "../../lib/aseprite-loader";
 import { Entity } from "./entity";
+import { Assets, Container, Sprite as PixiSprite } from "pixi.js";
 
+/**
+ * An entity that just plays the 'idle' animation of a spritesheet, e.g. for
+ * decorations or one-off effects. The spritesheet (sprites/[name].json) must
+ * already be loaded.
+ */
 export class Sprite extends Entity {
 
     name = '';
     oneLoop = false;
     anchorRatios: Point;
+
+    sprite = new PixiSprite();
 
     constructor(level: Level, name: string, { oneLoop = false, anchorRatios = { x: 0.5, y: 1 } } = {}) {
         super(level);
@@ -16,42 +24,40 @@ export class Sprite extends Entity {
         this.name = name;
         this.oneLoop = oneLoop;
         this.anchorRatios = anchorRatios;
+        this.debugColor = undefined;
 
-        Aseprite.images[name].loadPromise!.then(image => {
-            this.w = physFromPx(image.frames![0].sourceSize.w)
-            this.h = physFromPx(image.frames![0].sourceSize.h)
+        const firstFrame = this.asset.frameList[0];
+        this.w = physFromPx(firstFrame.orig.width);
+        this.h = physFromPx(firstFrame.orig.height);
 
-            this.x = this.x - this.w * this.anchorRatios.x;
-            this.y = this.y - this.h * this.anchorRatios.y;
-        });
+        this.sprite.anchor.set(anchorRatios.x, anchorRatios.y);
+        this.sprite.scale.set(PHYSICS_SCALE);
+    }
+
+    get asset(): AsepriteAsset {
+        return Assets.get<AsepriteAsset>(`sprites/${this.name}.json`);
     }
 
     update(dt: number): void {
         super.update(dt);
 
-        if (this.oneLoop) {
-            const imageData = Aseprite.images[this.name];
-            const animData = imageData.animations!['idle'];
-            if (this.animCount * 1000 >= animData.length) {
-                this.done = true;
-            }
+        if (this.oneLoop && this.animCount >= this.asset.getAnimationLength('idle')) {
+            this.done = true;
         }
     }
 
-    render(context: CanvasRenderingContext2D) {
-        // context.fillRect(this.x, this.y, this.w, this.h);
-        Aseprite.drawAnimation({
-            context,
-            image: this.name,
-            animationName: 'idle',
-            time: this.animCount,
-            position: {
-                x: this.x + this.anchorRatios.x * this.w,
-                y: this.y + this.anchorRatios.y * this.h,
-            },
-            scale: PHYSICS_SCALE,
-            anchorRatios: this.anchorRatios,
-            loop: !this.oneLoop,
-        });
+    addToScene(container: Container) {
+        container.addChild(this.sprite);
+        this.updateGraphics();
+    }
+
+    removeFromScene() {
+        this.sprite.removeFromParent();
+    }
+
+    updateGraphics() {
+        this.sprite.texture = this.asset.getFrameTexture('idle', this.animCount, !this.oneLoop);
+        this.sprite.x = this.x + this.anchorRatios.x * this.w;
+        this.sprite.y = this.y + this.anchorRatios.y * this.h;
     }
 }

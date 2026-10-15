@@ -1,14 +1,15 @@
 import { Dir, FacingDir, Point } from "../../common";
 import { FPS, JUMP_KEYS, LEFT_KEYS, physFromPx, PHYSICS_SCALE, RIGHT_KEYS } from "../../constants";
-import { Aseprite } from "../../lib/aseprite";
+import type { AsepriteAsset } from "../../lib/aseprite-loader";
 import { NullKeys } from "../../lib/keys";
 import { Level } from "../level";
 import { SFX } from "../sfx";
 import { ObjectTile } from "../tile/object-layer";
 import { PhysicTile } from "../tile/tiles";
 import { Entity } from "./entity";
+import { Assets, Container, Sprite } from "pixi.js";
 
-const imageName = 'player';
+const spritePath = 'sprites/player.json';
 
 // How long the player gets to jump after falling off a platform.
 // 0.1 seems a little too lenient, but whatever :)
@@ -34,6 +35,8 @@ export class Player extends Entity {
 
     bufferedJumpCount = 0;
 
+    sprite = new Sprite();
+
     constructor(level: Level) {
         super(level);
         // TODO: Set w and h
@@ -41,6 +44,10 @@ export class Player extends Entity {
         this.h = physFromPx(10);
         // TODO: Tweak gravity? This was from Teeniest Seed.
         this.gravity = 0.13 * PHYSICS_SCALE * FPS * FPS;
+
+        this.debugColor = undefined;
+        this.sprite.anchor.set(0.5, 1);
+        this.sprite.scale.set(PHYSICS_SCALE);
     }
 
     getAnimationName() {
@@ -76,23 +83,23 @@ export class Player extends Entity {
         return { animName, loop, facingDir }
     }
 
-    render(context: CanvasRenderingContext2D) {
-        // super.render(context);
+    addToScene(container: Container) {
+        container.addChild(this.sprite);
+        this.updateGraphics();
+    }
 
+    removeFromScene() {
+        this.sprite.removeFromParent();
+    }
+
+    updateGraphics() {
         const {animName, loop, facingDir} = this.getAnimationName();
 
-        Aseprite.drawAnimation({
-            context,
-            image: "player",
-            animationName: animName,
-            time: this.animCount,
-            position: {x: this.midX, y: this.maxY},
-            scale: PHYSICS_SCALE,
-            anchorRatios: {x: 0.5, y: 1},
-            // filter: filter,
-            flippedX: facingDir == FacingDir.Left,
-            loop,
-        });
+        const asset = Assets.get<AsepriteAsset>(spritePath);
+        this.sprite.texture = asset.getFrameTexture(animName, this.animCount, loop);
+        this.sprite.x = this.midX;
+        this.sprite.y = this.maxY;
+        this.sprite.scale.x = (facingDir == FacingDir.Left ? -1 : 1) * PHYSICS_SCALE;
     }
 
     cameraFocus(): Point {
@@ -247,6 +254,6 @@ export class Player extends Entity {
     }
 
     static async preload() {
-        await Aseprite.loadImage({name: imageName, basePath: 'sprites'});
+        await Assets.load<AsepriteAsset>(spritePath);
     }
 }

@@ -1,3 +1,4 @@
+// @ts-ignore: jsfxr has no type declarations.
 import { sfxr } from "jsfxr";
 import { MuteState, Sounds } from "../lib/sounds";
 
@@ -67,7 +68,7 @@ class _SFX {
 
     preload() {
         for (let key in sfx) {
-            this.sounds[key] = sfxr.toAudio(sfx[key]);
+            this.sounds[key] = sfxr.toAudio(sfx[key as keyof typeof sfx]);
         }
     }
 

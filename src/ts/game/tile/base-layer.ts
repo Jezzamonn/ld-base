@@ -1,5 +1,4 @@
 import { Point } from "../../common";
-import { TILE_SIZE } from "../../constants";
 import { TileLayer } from "./tile-layer";
 
 export enum BaseTile {
@@ -56,9 +55,9 @@ export class BaseLayer extends TileLayer<BaseTile> {
     renderTile(
         context: CanvasRenderingContext2D,
         pos: Point,
+        renderPos: Point,
     ) {
         const tile = this.getTile(pos);
-        const renderPos = {x: pos.x * TILE_SIZE, y: pos.y * TILE_SIZE }
 
         if (tile == BaseTile.Wall) {
             // Loop through each corner

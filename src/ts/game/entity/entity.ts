@@ -2,6 +2,7 @@ import { Dir, Dirs, FacingDir, Point } from "../../common";
 import { FPS, PHYSICS_SCALE } from "../../constants";
 import { Level } from "../level";
 import { PhysicTile, TileSource } from "../tile/tiles";
+import { Container, Graphics } from "pixi.js";
 
 export class Entity {
     level: Level;
@@ -20,7 +21,9 @@ export class Entity {
     canCollide = true;
     done = false;
 
+    /** Color of the placeholder rectangle. Set to undefined if the entity has its own graphics. */
     debugColor: string | undefined = '#ff00ff'
+    placeholderGraphics: Graphics | undefined;
 
     constructor(level: Level) {
         this.level = level;
@@ -154,11 +157,36 @@ export class Entity {
         return this.maxX > other.minX && this.minX < other.maxX && this.maxY > other.minY && this.minY < other.maxY;
     }
 
-    render(context: CanvasRenderingContext2D) {
+    /**
+     * Adds this entity's display objects to the scene. Called by the level
+     * when the entity is spawned. Subclasses should override this (and
+     * removeFromScene) to add their own sprites.
+     *
+     * By default, draws a placeholder rectangle in debugColor.
+     */
+    addToScene(container: Container) {
         if (this.debugColor) {
-            context.fillStyle = this.debugColor;
-            context.fillRect(this.x, this.y, this.w, this.h);
-            // console.log(`Rendering entity at ${this.x}, ${this.y} with size ${this.w}, ${this.h}`);
+            this.placeholderGraphics = new Graphics()
+                .rect(0, 0, this.w, this.h)
+                .fill(this.debugColor);
+            container.addChild(this.placeholderGraphics);
+        }
+        this.updateGraphics();
+    }
+
+    /** Removes this entity's display objects from the scene. Called when the entity is removed. */
+    removeFromScene() {
+        this.placeholderGraphics?.removeFromParent();
+    }
+
+    /**
+     * Syncs display objects (position, animation frame, etc.) with the
+     * entity's state. Called by the level after every update.
+     */
+    updateGraphics() {
+        if (this.placeholderGraphics) {
+            this.placeholderGraphics.x = this.x;
+            this.placeholderGraphics.y = this.y;
         }
     }
 

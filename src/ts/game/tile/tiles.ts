@@ -1,9 +1,9 @@
 import { Point } from "../../common";
-import { PHYSICS_SCALE, rng, TILE_SIZE, TILE_SIZE_PX } from "../../constants";
-import { Aseprite, images } from "../../lib/aseprite";
+import { TILE_SIZE } from "../../constants";
 import { Images } from "../../lib/images";
 import { BaseLayer, BaseTile } from "./base-layer";
 import { ObjectLayer, ObjectTile } from "./object-layer";
+import { Container } from "pixi.js";
 
 // All the types of tiles as far as how they interact with the game physics.
 export enum PhysicTile {
@@ -35,9 +35,20 @@ export class Tiles implements TileSource<PhysicTile> {
         this.objectLayer.update(dt);
     }
 
-    render(context: CanvasRenderingContext2D) {
-        this.baseLayer.render(context);
-        this.objectLayer.render(context);
+    addToScene(container: Container) {
+        this.baseLayer.addToScene(container);
+        this.objectLayer.addToScene(container);
+    }
+
+    removeFromScene() {
+        this.baseLayer.removeFromScene();
+        this.objectLayer.removeFromScene();
+    }
+
+    /** Redraw the tiles at these positions (and their neighbours) after changing them. */
+    patchTiles(positions: Point[]) {
+        this.baseLayer.patchTiles(positions);
+        this.objectLayer.patchTiles(positions);
     }
 
     getTileCoord(p: Point, positionInTile: Point): Point {

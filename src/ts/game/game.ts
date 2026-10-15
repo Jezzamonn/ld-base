@@ -1,24 +1,21 @@
-import { GAME_HEIGHT_PX, GAME_WIDTH_PX, physFromPx, PHYSICS_SCALE, pxFromPhys, RESTART_KEYS, SELECT_KEYS, TIME_STEP, TITLE_KEYS } from "../constants";
+import { GAME_HEIGHT_PX, GAME_WIDTH_PX, PHYSICS_SCALE, RESTART_KEYS, TIME_STEP } from "../constants";
 import { Player } from "./entity/player";
-import { Sprite } from "./entity/sprite";
-import { Aseprite } from "../lib/aseprite";
-import { Images } from "../lib/images";
 import { ComboKeys, KeyboardKeys, NullKeys, RegularKeys } from "../lib/keys";
 import { Sounds } from "../lib/sounds";
-import { centerCanvas } from "./camera";
+import { CAMERA_SCREEN_POS } from "./camera";
 import { Level } from "./level";
 import { Levels, LEVELS } from "./levels";
 import { SFX } from "./sfx";
 import { Tiles } from "./tile/tiles";
 import { Background } from "./background";
-import { wait } from "../lib/util";
 import { TouchKeys } from "./touch-keys";
+import { Application, Ticker } from "pixi.js";
 
 export class Game {
 
-    canvas: HTMLCanvasElement;
-    context: CanvasRenderingContext2D;
+    app: Application;
 
+    /** Scale from physics units to CSS pixels. */
     scale = 1;
 
     simulatedTimeMs: number | undefined;
@@ -30,15 +27,8 @@ export class Game {
     keys: RegularKeys;
     nullKeys = new NullKeys();
 
-    constructor(canvasSelector: string) {
-        const canvas = document.querySelector<HTMLCanvasElement>(canvasSelector);
-        if (!canvas) {
-            throw new Error(`Could not find canvas with selector ${canvasSelector}`);
-        }
-        const context = canvas.getContext('2d')!;
-
-        this.canvas = canvas;
-        this.context = context;
+    constructor(app: Application) {
+        this.app = app;
 
         this.keys = new ComboKeys(new KeyboardKeys(), new TouchKeys());
 
@@ -48,8 +38,6 @@ export class Game {
     start(testMode = false) {
         this.keys.setUp();
 
-        Aseprite.disableSmoothing(this.context);
-
         this.resize();
         if (!testMode) {
             window.addEventListener('resize', () => this.resize());
@@ -57,7 +45,7 @@ export class Game {
             // Whenever any touch event happens, try to enter fullscreen.
             window.addEventListener('touchstart', () => this.enterFullscreen());
 
-            this.doAnimationLoop();
+            this.app.ticker.add(this.tick, this);
         }
 
         this.startLevel(0);
@@ -72,11 +60,17 @@ export class Game {
     }
 
     startLevel(levelIndex: number) {
+        if (this.curLevel) {
+            this.curLevel.container.removeFromParent();
+            this.curLevel.container.destroy({ children: true });
+        }
+
         this.levelIndex = levelIndex;
         const levelInfo = LEVELS[this.levelIndex];
         const level = new Level(this, levelInfo);
         level.initFromImage();
         this.curLevel = level;
+        this.app.stage.addChild(level.container);
 
         // if (levelInfo.song) {
         //     Sounds.setSong(levelInfo.song);
@@ -87,7 +81,11 @@ export class Game {
         this.nextLevel();
     }
 
-    doAnimationLoop() {
+    /**
+     * Called by Pixi's ticker every animation frame. Runs the game logic at a
+     * fixed timestep; Pixi then renders the stage.
+     */
+    tick(_ticker: Ticker) {
         if (this.simulatedTimeMs == undefined) {
             this.simulatedTimeMs = Date.now();
         }
@@ -105,17 +103,14 @@ export class Game {
                 break;
             }
         }
-
-        this.render();
-
-        requestAnimationFrame(() => this.doAnimationLoop());
     }
 
+    /** Used by tests to step the game manually. */
     advanceFrames(frames: number) {
         for (let i = 0; i < frames; i++) {
             this.update(TIME_STEP);
         }
-        this.render();
+        this.app.render();
     }
 
     handleInput() {
@@ -148,44 +143,28 @@ export class Game {
         }
     }
 
-    applyScale(context: CanvasRenderingContext2D) {
-        context.scale(this.scale, this.scale);
-    }
-
-    render() {
-        this.context.resetTransform();
-        centerCanvas(this.context);
-        this.applyScale(this.context);
-
-        try {
-            this.curLevel?.render(this.context);
-        }
-        catch (e) {
-            console.error(e);
-        }
-    }
-
     resize() {
         const windowWidth = window.innerWidth;
         const windowHeight = window.innerHeight;
         const pixelScale = window.devicePixelRatio || 1;
 
-        // Set canvas size
+        this.app.renderer.resize(windowWidth, windowHeight);
+
         const xScale = windowWidth / GAME_WIDTH_PX;
         const yScale = windowHeight / GAME_HEIGHT_PX;
 
-        // Math.min = scale to fit
+        // Math.min = scale to fit. Floor in device pixels so that game pixels
+        // are always a whole number of device pixels.
         const pxScale = Math.floor(Math.min(xScale, yScale) * pixelScale);
-        this.scale = pxScale / PHYSICS_SCALE;
+        // The stage is in CSS pixels (Pixi handles the device pixel ratio).
+        this.scale = pxScale / pixelScale / PHYSICS_SCALE;
+        this.app.stage.scale.set(this.scale);
+
+        // Put the origin at the camera's focus point, snapped to a device pixel.
+        this.app.stage.x = Math.round(windowWidth * pixelScale * CAMERA_SCREEN_POS.x) / pixelScale;
+        this.app.stage.y = Math.round(windowHeight * pixelScale * CAMERA_SCREEN_POS.y) / pixelScale;
 
         document.body.style.setProperty('--scale', `${pxScale / pixelScale}`);
-
-        this.canvas.width = windowWidth * pixelScale;
-        this.canvas.height = windowHeight * pixelScale;
-        this.canvas.style.width = `${windowWidth}px`;
-        this.canvas.style.height = `${windowHeight}px`;
-        // Need to call this again when the canvas size changes.
-        Aseprite.disableSmoothing(this.context);
 
         // Set HTML element size
         document.body.style.setProperty('--pageWidth', `${windowWidth}px`);

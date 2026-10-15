@@ -1,8 +1,6 @@
+import { Assets, Container, Graphics, Sprite, Texture } from "pixi.js";
 import { Point } from "../common";
-import { physFromPx, PHYSICS_SCALE } from "../constants";
-import { Aseprite } from "../lib/aseprite";
-import { Images } from "../lib/images";
-import { centerCanvas } from "./camera";
+import { GAME_HEIGHT, GAME_WIDTH, physFromPx, PHYSICS_SCALE } from "../constants";
 import { Level } from "./level";
 
 interface ImageLayerInfo {
@@ -17,6 +15,8 @@ interface FillLayerInfo {
 
 type LayerInfo = ImageLayerInfo | FillLayerInfo;
 
+// Drawn in order, so later layers are drawn on top of earlier ones.
+// TODO: The fill layer currently covers the image layer. Swap them to make the image visible.
 const BG_LAYERS: LayerInfo[] = [
     {
         image: "background",
@@ -30,11 +30,18 @@ const BG_LAYERS: LayerInfo[] = [
         color: "#c0cbdc",
     },
 ];
+
+function imagePath(image: string) {
+    return `sprites/${image}.png`;
+}
+
 export class Background {
     level: Level;
 
     layers: BackgroundLayer[] = [];
     offset: Point;
+
+    container = new Container();
 
     constructor(level: Level, offset: Point) {
         this.level = level;
@@ -59,6 +66,11 @@ export class Background {
                 );
             }
         }
+
+        // Layers are drawn in list order (later layers on top).
+        for (const layer of this.layers) {
+            this.container.addChild(layer.container);
+        }
     }
 
     update(dt: number) {
@@ -67,9 +79,9 @@ export class Background {
         }
     }
 
-    render(context: CanvasRenderingContext2D) {
+    updateGraphics() {
         for (const layer of this.layers) {
-            layer.render(context);
+            layer.updateGraphics();
         }
     }
 
@@ -77,9 +89,7 @@ export class Background {
         const promises: Promise<any>[] = [];
         for (const layer of BG_LAYERS) {
             if ("image" in layer) {
-                promises.push(
-                    Images.loadImage({ name: layer.image, path: "sprites/" })
-                );
+                promises.push(Assets.load(imagePath(layer.image)));
             }
         }
         await Promise.all(promises);
@@ -87,37 +97,38 @@ export class Background {
 }
 
 interface BackgroundLayer {
+    container: Container;
+
     update(dt: number): void;
 
-    render(context: CanvasRenderingContext2D): void;
+    updateGraphics(): void;
 }
 
 class FillLayer implements BackgroundLayer {
-    color: string;
+    container: Graphics;
 
     constructor({ color }: { color: string }) {
-        this.color = color;
+        // Big enough to cover the screen regardless of the aspect ratio.
+        this.container = new Graphics()
+            .rect(-10 * GAME_WIDTH, -10 * GAME_HEIGHT, 20 * GAME_WIDTH, 20 * GAME_HEIGHT)
+            .fill(color);
     }
 
-    update(dt: number) {}
+    update(_dt: number) {}
 
-    render(context: CanvasRenderingContext2D) {
-        // Clear transform
-        context.save();
-        context.resetTransform();
-        context.fillStyle = this.color;
-        context.fillRect(0, 0, context.canvas.width, context.canvas.height);
-        context.restore();
-    }
+    updateGraphics() {}
 }
 
-class ImageLayer implements BackgroundLayer{
+class ImageLayer implements BackgroundLayer {
     background: Background;
     animCount = 0;
     image = "";
     scale = 1;
 
     offset: Point;
+
+    container = new Container();
+    sprite: Sprite;
 
     constructor({
         background,
@@ -134,39 +145,22 @@ class ImageLayer implements BackgroundLayer{
         this.image = image;
         this.scale = scale;
         this.offset = offset;
+
+        this.sprite = new Sprite(Assets.get<Texture>(imagePath(image)));
+        this.sprite.scale.set(PHYSICS_SCALE);
+        this.container.addChild(this.sprite);
     }
 
     update(dt: number) {
         this.animCount += dt;
     }
 
-    render(context: CanvasRenderingContext2D) {
-        // TODO: Apply scale.
-        context.save();
-        context.resetTransform();
+    updateGraphics() {
+        // The layer moves with the camera, but scaled down for a parallax effect.
+        this.background.level.camera.applyToPixi(this.container, this.scale);
 
-        centerCanvas(context);
-
-        // This part of the code could be better so it's not reaching into the
-        // other parts of the code base as much. Probably requires refactoring
-        // of some camera stuff.
-        this.background.level.game.applyScale(context);
-        this.background.level.camera.applyTransform(context, this.scale);
-
-        // const isCloud = this.image.startsWith("bg-clouds");
-        // let windOffset = 0;
-        // if (isCloud) {
-        //     windOffset = 30 * this.scale * this.animCount;
-        // }
-
-        const image = Images.images[this.image].image!;
-        context.drawImage(image,
-            physFromPx(this.offset.x - image.width / 2 + this.scale * this.background.offset.x),
-            physFromPx(this.offset.y - image.height / 2 + this.scale * this.background.offset.y),
-            physFromPx(image.width),
-            physFromPx(image.height),
-        );
-
-        context.restore();
+        const texture = this.sprite.texture;
+        this.sprite.x = physFromPx(this.offset.x - texture.width / 2 + this.scale * this.background.offset.x);
+        this.sprite.y = physFromPx(this.offset.y - texture.height / 2 + this.scale * this.background.offset.y);
     }
 }
