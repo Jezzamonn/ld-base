@@ -134,6 +134,7 @@ export class Game {
         try {
             this.handleInput();
 
+            Sounds.update(dt);
             this.curLevel?.update(dt);
 
             this.keys.resetFrame();

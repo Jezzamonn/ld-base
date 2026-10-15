@@ -158,14 +158,10 @@ export function* setEntitiesUpdatesEnabled(level: ILevel, enabled: boolean): Cor
  */
 export function* playAudio(name: string, input?: IInput, overlay?: IOverlay): Coroutine {
     let done = false;
-    const soundsAny = Sounds as any;
-    const subtitles: string[] | undefined = soundsAny.getSubtitles ? soundsAny.getSubtitles(name) : undefined;
-    const audio: HTMLAudioElement | undefined = soundsAny.getAudio ? soundsAny.getAudio(name) : undefined;
+    const subtitles = Sounds.getSubtitles(name);
+    const audio = Sounds.getAudio(name);
 
-    const soundWait = soundsAny.playSoundAndWait
-        ? soundsAny.playSoundAndWait(name)
-        : { promise: Promise.resolve(), stop: () => {} };
-    const { promise, stop } = soundWait;
+    const { promise, stop } = Sounds.playSoundAndWait(name);
     promise.then(() => {
         done = true;
     });
